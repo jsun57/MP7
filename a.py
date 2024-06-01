@@ -114,4 +114,27 @@ class Block(nn.Module):
         return x
 
 
+def get_scheduler(optimizer, policy, milestones=None, gamma=0.5, factor=0.2, threshold=1e-4, patience=2):
+    if policy == 'multi':
+        scheduler = lr_scheduler.MultiStepLR(optimizer, milestones=milestones, gamma=gamma)
+    elif policy == 'plateau':
+        scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=factor, threshold=threshold, patience=patience)
+    elif policy == 'lambda':
+        def create_lr_lambda(milestones, gammas):
+            assert len(milestones) == len(gammas), "Milestones and gammas lists must be of the same length"
+            def lr_lambda(epoch):
+                # Initialize the multiplier as 1 (no change to lr initially)
+                multiplier = 1.0
+                for i, milestone in enumerate(milestones):
+                    if epoch >= milestone:
+                        multiplier *= gammas[i]
+                    else:
+                        break  # No need to check further once the current epoch is less than the milestone
+                return multiplier
+            return lr_lambda
+        scheduler = lr_scheduler.LambdaLR(optimizer, lr_lambda=create_lr_lambda(milestones, gamma))
+    else:
+        return NotImplementedError('LR scheduler policy [%s] is not implemented', policy)
+    return scheduler
+
 
